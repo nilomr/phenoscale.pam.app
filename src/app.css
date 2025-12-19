@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+
+:root {
+	/* Colors */
+	--color-bg: #1a1b1e;
+	--color-bg-elevated: #242529;
+	--color-text: rgba(255, 255, 255, 0.95);
+	--color-text-muted: rgba(255, 255, 255, 0.6);
+	--color-text-dim: rgba(255, 255, 255, 0.4);
+	--color-border: rgba(255, 255, 255, 0.1);
+	--color-border-subtle: rgba(255, 255, 255, 0.05);
+	
+	/* Accent colors */
+	--color-primary: #197569;
+	--color-secondary: #ffd000;
+	
+	/* Typography */
+	--font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+	--font-serif: 'DM Serif Text', Georgia, serif;
+	
+	/* Font sizes */
+	--text-xs: 11px;
+	--text-sm: 13px;
+	--text-base: 15px;
+	--text-lg: 18px;
+	--text-xl: 24px;
+	--text-2xl: 32px;
+	
+	/* Spacing */
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 32px;
+	--space-8: 48px;
+	
+	/* Transitions */
+	--transition-fast: 0.15s ease-out;
+	--transition-normal: 0.25s ease-out;
+	--transition-slow: 0.4s ease-out;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	margin: 0;
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: var(--font-sans);
+	line-height: 1.5;
+}
+
+/* Utility classes */
+.fade-in {
+	animation: fadeIn var(--transition-normal) forwards;
+}
+
+@keyframes fadeIn {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+	to { transform: rotate(360deg); }
+}
