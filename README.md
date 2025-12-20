@@ -1,6 +1,6 @@
-# Whytham Woods Birdsong
+# Wytham Woods Birdsong
 
-An interactive visualization of bird vocal activity trends across 81 acoustic loggers placed in a grid at Whytham Woods. Built with SvelteKit, TypeScript, D3.js, and SVG.
+An interactive visualization of bird vocal activity trends across 81 acoustic loggers placed in a grid at Wytham Woods. Built with SvelteKit, TypeScript, D3.js, and SVG.
 
 ## Features
 

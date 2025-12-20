@@ -113,7 +113,7 @@
 </script>
 
 <svelte:head>
-	<title>Whytham Woods Acoustic Monitor</title>
+	<title>Wytham Woods Acoustic Monitor</title>
 </svelte:head>
 
 <main>
@@ -133,7 +133,7 @@
 			<header>
 				<div class="title-block">
 					<span class="pre-title">the</span>
-					<h1>WHYTHAM WOODS</h1>
+					<h1>WYTHAM WOODS</h1>
 					<span class="sub-title">Acoustic Monitor</span>
 				</div>
 				<div class="header-right">
@@ -216,7 +216,7 @@
 			<header class="mobile-header">
 				<div class="mobile-title-block">
 					<span class="mobile-pre-title">the</span>
-					<h1 class="mobile-main-title">WHYTHAM WOODS</h1>
+					<h1 class="mobile-main-title">WYTHAM WOODS</h1>
 					<span class="mobile-sub-title">Acoustic Monitor</span>
 				</div>
 				<div class="mobile-header-right">

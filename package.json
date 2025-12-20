@@ -1,9 +1,9 @@
 {
-	"name": "whytham-birdsong",
+	"name": "wytham-birdsong",
 	"private": true,
 	"version": "0.1.0",
 	"type": "module",
-	"description": "Bird vocal activity trends visualization for Whytham Woods acoustic monitoring",
+	"description": "Bird vocal activity trends visualization for Wytham Woods acoustic monitoring",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
