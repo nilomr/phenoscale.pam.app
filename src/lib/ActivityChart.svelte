@@ -35,7 +35,7 @@ import { fade } from 'svelte/transition';
 	}: Props = $props();
 
 	// Chart dimensions
-	const PADDING = { top: 60, right: 0, bottom: 50, left: 60 };
+	const PADDING = { top: 60, right: 0, bottom: isMobile ? 20 : 50, left: 60 };
 	let containerWidth = $state(800);
 	let containerHeight = $state(450);
 

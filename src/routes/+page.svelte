@@ -317,7 +317,6 @@
 			<div class="mobile-sheet" class:open={mobileSheetOpen}>
 				<!-- Sheet Handle -->
 				<button class="sheet-handle" onclick={toggleMobileSheet}>
-					<div class="handle-bar"></div>
 					<span class="sheet-peek">
 						{#if selectedSpecies}
 							{@const speciesData = getSpeciesData(selectedSpecies, birdData ?? undefined)}
@@ -975,22 +974,20 @@
 
 	.sheet-handle {
 		width: 100%;
-		padding: 12px 16px 8px;
+		padding: 16px;
 		background: none;
 		border: none;
 		cursor: pointer;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 10px;
 		flex-shrink: 0;
+		border-radius: 20px 20px 0 0;
+		transition: background-color 0.2s ease;
 	}
 
-	.handle-bar {
-		width: 36px;
-		height: 4px;
-		background: rgba(255, 255, 255, 0.25);
-		border-radius: 2px;
+	.sheet-handle:hover {
+		background: rgba(255, 255, 255, 0.05);
 	}
 
 	.sheet-peek {
