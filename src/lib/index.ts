@@ -5,3 +5,7 @@ export { default as ViewControls } from './ViewControls.svelte';
 
 // Types
 export * from './types';
+
+// Services
+export * from './weatherService';
+export * from './ndviService';

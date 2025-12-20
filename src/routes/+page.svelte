@@ -16,6 +16,7 @@
 	let showSiteLines = $state(false);
 	let showTemperature = $state(false);
 	let showPrecipitation = $state(false);
+	let showNdvi = $state(false);
 	
 	// Mobile UI state
 	let mobileSheetOpen = $state(false);
@@ -77,6 +78,10 @@
 
 	function togglePrecipitation() {
 		showPrecipitation = !showPrecipitation;
+	}
+
+	function toggleNdvi() {
+		showNdvi = !showNdvi;
 	}
 
 	function toggleMobileSheet() {
@@ -174,6 +179,8 @@
 						onToggleTemperature={toggleTemperature}
 						{showPrecipitation}
 						onTogglePrecipitation={togglePrecipitation}
+						{showNdvi}
+						onToggleNdvi={toggleNdvi}
 					/>
 				</div>
 				
@@ -192,6 +199,7 @@
 						{imageMap}
 						{showTemperature}
 						{showPrecipitation}
+						{showNdvi}
 						dateRange={data.metadata.dateRange}
 					/>
 				</div>
@@ -279,6 +287,18 @@
 									</svg>
 									<span>Rain</span>
 								</button>
+								<button 
+									class="mobile-pill ndvi" 
+									class:active={showNdvi}
+									onclick={toggleNdvi}
+								>
+									<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M12 2a10 10 0 1 0 10 10"/>
+										<path d="M12 12 4.93 19.07"/>
+										<path d="M12 2v10"/>
+									</svg>
+									<span>NDVI</span>
+								</button>
 							</div>
 						</div>
 						{#if selectedSpeciesImage()}
@@ -307,6 +327,7 @@
 						{imageMap}
 						{showTemperature}
 						{showPrecipitation}
+						{showNdvi}
 						dateRange={data.metadata.dateRange}
 						isMobile={true}
 					/>
@@ -902,6 +923,12 @@
 		background: rgba(96, 165, 250, 0.2);
 		border-color: rgba(96, 165, 250, 0.35);
 		color: rgba(160, 200, 255, 1);
+	}
+
+	.mobile-pill.ndvi.active {
+		background: rgba(34, 197, 94, 0.2);
+		border-color: rgba(34, 197, 94, 0.35);
+		color: rgba(130, 220, 160, 1);
 	}
 
 	.mobile-pill svg {

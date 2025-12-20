@@ -6,6 +6,7 @@
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 	import { fetchHistoricalWeather, type DailyWeather } from './weatherService';
+	import { fetchNdviData, processNdviData, type ProcessedNdviData } from './ndviService';
 import { fade } from 'svelte/transition';
 
 	interface Props {
@@ -17,6 +18,7 @@ import { fade } from 'svelte/transition';
 		imageMap: Record<string, string>;
 		showTemperature?: boolean;
 		showPrecipitation?: boolean;
+		showNdvi?: boolean;
 		dateRange?: { start: string; end: string };
 		isMobile?: boolean;
 	}
@@ -30,6 +32,7 @@ import { fade } from 'svelte/transition';
 		imageMap,
 		showTemperature = false,
 		showPrecipitation = false,
+		showNdvi = false,
 		dateRange,
 		isMobile = false
 	}: Props = $props();
@@ -52,6 +55,10 @@ import { fade } from 'svelte/transition';
 	let weatherData = $state<DailyWeather[]>([]);
 	let weatherLoading = $state(false);
 
+	// NDVI data state
+	let ndviData = $state<ProcessedNdviData | null>(null);
+	let ndviLoading = $state(false);
+
 	// Fetch weather data when date range changes
 	$effect(() => {
 		if (!dateRange?.start || !dateRange?.end) return;
@@ -67,6 +74,22 @@ import { fade } from 'svelte/transition';
 			})
 			.finally(() => {
 				weatherLoading = false;
+			});
+	});
+
+	// Fetch NDVI data on mount
+	$effect(() => {
+		ndviLoading = true;
+		fetchNdviData()
+			.then(data => {
+				ndviData = processNdviData(data);
+			})
+			.catch(err => {
+				console.warn('Failed to fetch NDVI data:', err);
+				ndviData = null;
+			})
+			.finally(() => {
+				ndviLoading = false;
 			});
 	});
 
@@ -316,6 +339,61 @@ import { fade } from 'svelte/transition';
 	// Temperature area path
 	const tempAreaPath = $derived(tempAreaData.length > 0 ? tempAreaGenerator(tempAreaData) : null);
 
+	// NDVI scale (0-1 range mapped to right Y axis)
+	const ndviScale = $derived(
+		d3.scaleLinear()
+			.domain([0.4, 1]) // NDVI typically ranges from ~0.5 to ~0.95 for vegetation
+			.range([height, 0])
+	);
+
+	// NDVI color scale (brown to green)
+	const ndviColorScale = $derived(
+		d3.scaleSequential(
+			d3.interpolateRgbBasis([
+				'#8B7355', // brown
+				'#A8B06D', // olive
+				'#6B8E23', // olive drab
+				'#228B22', // forest green
+				'#22C55E'  // bright green
+			])
+		)
+			.domain([0.5, 0.95])
+	);
+
+	// NDVI line generator - use curveBasis for smoother lines
+	const ndviLineGenerator = $derived(
+		d3.line<[Date, number]>()
+			.x(d => xScale(d[0]))
+			.y(d => ndviScale(d[1]))
+			.curve(d3.curveBasis)
+			.defined(d => d[1] != null)
+	);
+
+	// Per-logger NDVI line data
+	const ndviLoggerLines = $derived.by(() => {
+		if (!ndviData) return [];
+		const lines: { name: string; data: [Date, number][] }[] = [];
+		for (const [name, logger] of ndviData.loggers) {
+			const data: [Date, number][] = [];
+			for (let i = 0; i < logger.dates.length; i++) {
+				data.push([logger.dates[i], logger.ndvi[i]]);
+			}
+			if (data.length > 0) {
+				lines.push({ name, data });
+			}
+		}
+		return lines;
+	});
+
+	// NDVI date range for gradient fade
+	const ndviDateRange = $derived.by(() => {
+		if (!ndviData?.dateRange) return null;
+		return {
+			startX: xScale(ndviData.dateRange.start),
+			endX: xScale(ndviData.dateRange.end)
+		};
+	});
+
 	// Stream paths for stacked view
 	const streamPaths = $derived.by(() => {
 		if (!stackedData) return [];
@@ -427,6 +505,26 @@ import { fade } from 'svelte/transition';
 					<stop offset={stop.offset} stop-color={stop.color} />
 				{/each}
 			</linearGradient>
+
+			<!-- NDVI horizontal fade gradient (fade in at start, fade out at end) -->
+			{#if ndviDateRange}
+				{@const fadeWidth = 80}
+				<linearGradient id="ndvi-fade" x1="0" x2="1" y1="0" y2="0">
+					<stop offset="0%" stop-color="white" stop-opacity="0"/>
+					<stop offset="{Math.min(20, fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="1"/>
+					<stop offset="{Math.max(80, 100 - fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="1"/>
+					<stop offset="100%" stop-color="white" stop-opacity="0"/>
+				</linearGradient>
+				<mask id="ndvi-mask">
+					<rect 
+						x={ndviDateRange.startX - 10} 
+						y="0" 
+						width={ndviDateRange.endX - ndviDateRange.startX + 20} 
+						height={height} 
+						fill="url(#ndvi-fade)"
+					/>
+				</mask>
+			{/if}
 		</defs>
 		
 		<g transform="translate({PADDING.left}, {PADDING.top})">
@@ -535,6 +633,25 @@ import { fade } from 'svelte/transition';
 							/>
 						{/if}
 
+						<!-- NDVI logger lines with fade effect -->
+						{#if showNdvi && ndviLoggerLines.length > 0 && ndviDateRange}
+							<g class="ndvi-logger-lines" mask="url(#ndvi-mask)" transition:fade={{ duration: 200 }}>
+								{#each ndviLoggerLines as logger, i (logger.name)}
+									{@const pathD = ndviLineGenerator(logger.data)}
+									{#if pathD && !pathD.includes('NaN')}
+										<path
+											d={pathD}
+											fill="none"
+											stroke="rgba(34, 197, 94, 0.7)"
+											stroke-width="1.2"
+											opacity="0.25"
+											class="ndvi-logger-line animated-line"
+										/>
+									{/if}
+								{/each}
+							</g>
+						{/if}
+
 						<!-- Site lines (background) -->
 						{#if showSiteLines}
 							{@const siteEntries = Object.entries(sp.timeSeries.sites)}
@@ -615,6 +732,36 @@ import { fade } from 'svelte/transition';
 								class="axis-title temp"
 							>
 								Temperature (°C)
+							</text>
+						</g>
+					{/if}
+
+					<!-- NDVI Y axis (right side) -->
+					{#if showNdvi && !showTemperature}
+						{@const ndviTicks = ndviScale.ticks(5)}
+						<g class="y-axis ndvi-axis" transform="translate({width}, 0)">
+							{#each ndviTicks as tick}
+								<g transform="translate(0, {ndviScale(tick)})">
+									<text 
+										x="12" 
+										text-anchor="start" 
+										dominant-baseline="middle" 
+										class="axis-label ndvi"
+										fill={ndviColorScale(tick)}
+										style="opacity: 0.9"
+									>
+										{tick.toFixed(2)}
+									</text>
+								</g>
+							{/each}
+							<text
+								transform="rotate(90)"
+								x={height / 2}
+								y="-40"
+								text-anchor="middle"
+								class="axis-title ndvi"
+							>
+								NDVI
 							</text>
 						</g>
 					{/if}
@@ -742,6 +889,20 @@ import { fade } from 'svelte/transition';
 
 	.axis-title.temp {
 		fill: rgba(255, 107, 53, 0.6);
+	}
+
+	/* NDVI styles */
+	.ndvi-logger-line {
+		pointer-events: none;
+		transition: d 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out;
+	}
+
+	.axis-label.ndvi {
+		fill: rgba(34, 197, 94, 0.8);
+	}
+
+	.axis-title.ndvi {
+		fill: rgba(34, 197, 94, 0.7);
 	}
 
 	/* Tooltip */

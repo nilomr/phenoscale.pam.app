@@ -8,6 +8,8 @@
 		onToggleTemperature?: () => void;
 		showPrecipitation?: boolean;
 		onTogglePrecipitation?: () => void;
+		showNdvi?: boolean;
+		onToggleNdvi?: () => void;
 	}
 
 	let { 
@@ -18,7 +20,9 @@
 		showTemperature = false,
 		onToggleTemperature,
 		showPrecipitation = false,
-		onTogglePrecipitation
+		onTogglePrecipitation,
+		showNdvi = false,
+		onToggleNdvi
 	}: Props = $props();
 </script>
 
@@ -51,6 +55,16 @@
 					<span class="toggle-thumb"></span>
 				</span>
 				<span class="toggle-label">Precipitation</span>
+			</label>
+		{/if}
+
+		{#if onToggleNdvi}
+			<label class="toggle-control">
+				<input type="checkbox" checked={showNdvi} onchange={onToggleNdvi} />
+				<span class="toggle-track ndvi">
+					<span class="toggle-thumb"></span>
+				</span>
+				<span class="toggle-label">NDVI</span>
 			</label>
 		{/if}
 	</div>
@@ -97,6 +111,10 @@
 
 	.toggle-control input:checked + .toggle-track.precip {
 		background: rgba(96, 165, 250, 0.5);
+	}
+
+	.toggle-control input:checked + .toggle-track.ndvi {
+		background: rgba(34, 197, 94, 0.5);
 	}
 
 	.toggle-thumb {
