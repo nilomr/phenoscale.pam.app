@@ -28,44 +28,67 @@
 
 {#if selectedSpecies}
 	<div class="view-controls">
-		<label class="toggle-control">
-			<input type="checkbox" checked={showSiteLines} onchange={onToggleSiteLines} />
-			<span class="toggle-track">
-				<span class="toggle-thumb"></span>
-			</span>
-			<span class="toggle-label">
-				{siteCount} sites
-			</span>
-		</label>
+		<button 
+			class="control-btn" 
+			class:active={showSiteLines}
+			onclick={onToggleSiteLines}
+			title="{siteCount} sites"
+		>
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="2"/>
+				<circle cx="6" cy="6" r="1.5"/>
+				<circle cx="18" cy="6" r="1.5"/>
+				<circle cx="6" cy="18" r="1.5"/>
+				<circle cx="18" cy="18" r="1.5"/>
+				<path d="M6 6l6 6m0 0l6-6m-6 6l-6 6m6-6l6 6" opacity="0.5"/>
+			</svg>
+			<span>Sites</span>
+		</button>
 
 		{#if onToggleTemperature}
-			<label class="toggle-control">
-				<input type="checkbox" checked={showTemperature} onchange={onToggleTemperature} />
-				<span class="toggle-track temp">
-					<span class="toggle-thumb"></span>
-				</span>
-				<span class="toggle-label">Temperature</span>
-			</label>
+			<button 
+				class="control-btn temp" 
+				class:active={showTemperature}
+				onclick={onToggleTemperature}
+				title="Temperature"
+			>
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+					<circle cx="11.5" cy="17.5" r="1.5" fill="currentColor"/>
+				</svg>
+				<span>Temp</span>
+			</button>
 		{/if}
 
 		{#if onTogglePrecipitation}
-			<label class="toggle-control">
-				<input type="checkbox" checked={showPrecipitation} onchange={onTogglePrecipitation} />
-				<span class="toggle-track precip">
-					<span class="toggle-thumb"></span>
-				</span>
-				<span class="toggle-label">Precipitation</span>
-			</label>
+			<button 
+				class="control-btn precip" 
+				class:active={showPrecipitation}
+				onclick={onTogglePrecipitation}
+				title="Precipitation"
+			>
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+				</svg>
+				<span>Rain</span>
+			</button>
 		{/if}
 
 		{#if onToggleNdvi}
-			<label class="toggle-control">
-				<input type="checkbox" checked={showNdvi} onchange={onToggleNdvi} />
-				<span class="toggle-track ndvi">
-					<span class="toggle-thumb"></span>
-				</span>
-				<span class="toggle-label">NDVI</span>
-			</label>
+			<button 
+				class="control-btn ndvi" 
+				class:active={showNdvi}
+				onclick={onToggleNdvi}
+				title="NDVI"
+			>
+				<!-- Tree icon for NDVI -->
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M12 2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.4 1.3.1 2.5.6 3.4 1.6 1 1 1 2.6 0 3.6-1 1-2.6 1-3.6 0-.7-.7-1.7-1.1-2.6-1.1H10.1c-.9 0-1.9.4-2.6 1.1-1 1-2.6 1-3.6 0-1-1-1-2.6 0-3.6.9-1 2.1-1.5 3.4-1.6C7.1 7 7 6.5 7 6c0-2.2 1.8-4 4-4z"/>
+					<path d="M12 13v8"/>
+					<path d="M9 21h6"/>
+				</svg>
+				<span>NDVI</span>
+			</button>
 		{/if}
 	</div>
 {/if}
@@ -74,69 +97,60 @@
 	.view-controls {
 		display: flex;
 		align-items: center;
-		gap: 16px;
+		gap: 4px;
+		background: rgba(255, 255, 255, 0.04);
+		border-radius: 20px;
+		padding: 3px;
+		border: 1px solid rgba(255, 255, 255, 0.08);
 	}
 
-	.toggle-control {
+	.control-btn {
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: 5px;
+		padding: 6px 10px;
+		border-radius: 16px;
+		border: none;
+		background: transparent;
+		color: rgba(255, 255, 255, 0.45);
+		font-size: 11px;
+		font-weight: 500;
 		cursor: pointer;
+		transition: all 0.15s ease;
 		user-select: none;
 	}
 
-	.toggle-control input {
-		position: absolute;
-		opacity: 0;
-		width: 0;
-		height: 0;
-	}
-
-	.toggle-track {
-		position: relative;
-		width: 40px;
-		height: 22px;
-		background: rgba(255, 255, 255, 0.15);
-		border-radius: 11px;
-		transition: background 0.2s ease;
-	}
-
-	.toggle-control input:checked + .toggle-track {
-		background: rgba(255, 255, 255, 0.35);
-	}
-
-	.toggle-control input:checked + .toggle-track.temp {
-		background: rgba(255, 107, 53, 0.5);
-	}
-
-	.toggle-control input:checked + .toggle-track.precip {
-		background: rgba(96, 165, 250, 0.5);
-	}
-
-	.toggle-control input:checked + .toggle-track.ndvi {
-		background: rgba(34, 197, 94, 0.5);
-	}
-
-	.toggle-thumb {
-		position: absolute;
-		top: 3px;
-		left: 3px;
-		width: 16px;
-		height: 16px;
-		background: rgba(255, 255, 255, 0.9);
-		border-radius: 50%;
-		transition: transform 0.2s ease;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-	}
-
-	.toggle-control input:checked + .toggle-track .toggle-thumb {
-		transform: translateX(18px);
-	}
-
-	.toggle-label {
-		font-size: 13px;
+	.control-btn:hover {
 		color: rgba(255, 255, 255, 0.7);
-		font-weight: 500;
-		letter-spacing: 0.01em;
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.control-btn.active {
+		background: rgba(255, 255, 255, 0.1);
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.control-btn.temp.active {
+		background: rgba(239, 68, 68, 0.15);
+		color: #fca5a5;
+	}
+
+	.control-btn.precip.active {
+		background: rgba(59, 130, 246, 0.15);
+		color: #93c5fd;
+	}
+
+	.control-btn.ndvi.active {
+		background: rgba(34, 197, 94, 0.15);
+		color: #86efac;
+	}
+
+	.control-btn svg {
+		flex-shrink: 0;
+		opacity: 0.7;
+	}
+
+	.control-btn.active svg {
+		opacity: 1;
 	}
 </style>
