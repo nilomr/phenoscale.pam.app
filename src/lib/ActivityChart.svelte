@@ -5,8 +5,8 @@
     import { tick } from 'svelte';
     import { tweened } from 'svelte/motion';
     import { cubicOut } from 'svelte/easing';
-    import { fetchHistoricalWeather, type DailyWeather } from './weatherService';
-    import { fetchNdviData, processNdviData, type ProcessedNdviData } from './ndviService';
+    import type { DailyWeather } from './weatherService';
+    import type { ProcessedNdviData } from './ndviService';
     import { fade } from 'svelte/transition';
 
     interface Props {
@@ -38,9 +38,10 @@
     }: Props = $props();
 
     // Chart dimensions
-    const PADDING = { top: 60, right: 0, bottom: isMobile ? 20 : 50, left: 60 };
-    let containerWidth = $state(800);
-    let containerHeight = $state(450);
+    const PADDING = { top: 60, right: 0, bottom: isMobile ? 20 : 20, left: 60 };
+    let containerWidth = $state(0);
+    let containerHeight = $state(0);
+    let containerMeasured = $state(false);
 
     const width = $derived(Math.max(200, containerWidth - PADDING.left - PADDING.right));
     const height = $derived(Math.max(150, containerHeight - PADDING.top - PADDING.bottom));
@@ -73,47 +74,18 @@
         ndvi: undefined
     });
 
-    // Weather data state
-    let weatherData = $state<DailyWeather[]>([]);
-    let weatherLoading = $state(false);
+    // Current hovered series name (in stacked/streams view)
+    let hoveredStreamName = $state<string | null>(null);
 
-    // NDVI data state
-    let ndviData = $state<ProcessedNdviData | null>(null);
-    let ndviLoading = $state(false);
-
-    // Fetch weather data when date range changes
-    $effect(() => {
-        if (!dateRange?.start || !dateRange?.end) return;
-        
-        weatherLoading = true;
-        fetchHistoricalWeather(dateRange.start, dateRange.end)
-            .then(data => {
-                weatherData = data.daily;
-            })
-            .catch(err => {
-                console.warn('Failed to fetch weather data:', err);
-                weatherData = [];
-            })
-            .finally(() => {
-                weatherLoading = false;
-            });
-    });
-
-    // Fetch NDVI data on mount
-    $effect(() => {
-        ndviLoading = true;
-        fetchNdviData()
-            .then(data => {
-                ndviData = processNdviData(data);
-            })
-            .catch(err => {
-                console.warn('Failed to fetch NDVI data:', err);
-                ndviData = null;
-            })
-            .finally(() => {
-                ndviLoading = false;
-            });
-    });
+    // Get preloaded data from store
+    import { getWeatherData, getNdviData } from './dataStore';
+    
+    // Weather and NDVI data - use preloaded data synchronously
+    const preloadedWeather = getWeatherData();
+    const preloadedNdvi = getNdviData();
+    
+    let weatherData = $state<DailyWeather[]>(preloadedWeather?.daily || []);
+    let ndviData = $state<ProcessedNdviData | null>(preloadedNdvi);
 
     // Filter species to display
     const displaySpecies = $derived(
@@ -486,6 +458,9 @@
         const nearestDate = dates[i];
 
         let speciesData: { name: string; value: number; color: string; imageSrc: string | null } | null = null;
+        // Pixel coordinates for the hovered segment (if any)
+        let segmentTop: number | undefined = undefined;
+        let segmentBottom: number | undefined = undefined;
 
         if (selectedSpecies) {
             // Single species mode
@@ -509,7 +484,7 @@
                 const point = series[i];
                 const y0 = yScale(point[0]);
                 const y1 = yScale(point[1]);
-                
+
                 // Check if mouse Y is within this stream
                 if (mouseY >= y1 && mouseY <= y0) {
                     const value = point[1] - point[0];
@@ -522,9 +497,17 @@
                         color: colorScale(series.key),
                         imageSrc
                     };
+
+                    // Store hovered stream name and the pixel bounds for the highlighted segment
+                    hoveredStreamName = series.key;
+                    segmentTop = y1;
+                    segmentBottom = y0;
                     break;
                 }
             }
+
+            // If nothing was found under the cursor in stacked view, clear hovered name
+            if (!speciesData) hoveredStreamName = null;
         }
 
         // Get weather data for this date
@@ -555,6 +538,9 @@
             chartX: mouseX, // Use actual mouse X position for the line
             date: nearestDate,
             species: speciesData,
+            // Pixel coordinates for the hovered segment (if any)
+            segmentTop,
+            segmentBottom,
             temperature: weather && showTemperature ? {
                 min: weather.temperatureMin,
                 max: weather.temperatureMax,
@@ -567,6 +553,7 @@
 
     function hideTooltip() {
         tooltip.show = false;
+        hoveredStreamName = null;
     }
 
     // Resize observer
@@ -579,6 +566,7 @@
                 if (rect.width > 0 && rect.height > 0) {
                     containerWidth = rect.width;
                     containerHeight = rect.height;
+                    containerMeasured = true;
                 }
                 await tick();
             }
@@ -589,11 +577,12 @@
 </script>
 
 <div class="chart-container" bind:this={containerEl}>
-    <svg 
-        class="chart-svg"
-        viewBox="0 0 {containerWidth + 60} {containerHeight}"
-        preserveAspectRatio="xMidYMid meet"
-    >
+    {#if containerMeasured}
+        <svg 
+            class="chart-svg"
+            viewBox="0 0 {containerWidth + 60} {containerHeight}"
+            preserveAspectRatio="xMidYMid meet"
+        >
         <defs>
             <!-- Organic glow filter -->
             <filter id="stream-glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -624,18 +613,20 @@
 
             <!-- NDVI horizontal fade gradient (fade in at start, fade out at end) -->
             {#if ndviDateRange}
-                {@const fadeWidth = 80}
+                {@const fadeWidth = 120}
                 <linearGradient id="ndvi-fade" x1="0" x2="1" y1="0" y2="0">
                     <stop offset="0%" stop-color="white" stop-opacity="0"/>
-                    <stop offset="{Math.min(20, fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="1"/>
-                    <stop offset="{Math.max(80, 100 - fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="1"/>
+                    <stop offset="{Math.min(15, fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="0.3"/>
+                    <stop offset="{Math.min(25, fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="1"/>
+                    <stop offset="{Math.max(75, 100 - fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="1"/>
+                    <stop offset="{Math.max(85, 100 - fadeWidth / (ndviDateRange.endX - ndviDateRange.startX) * 100)}%" stop-color="white" stop-opacity="0.3"/>
                     <stop offset="100%" stop-color="white" stop-opacity="0"/>
                 </linearGradient>
                 <mask id="ndvi-mask">
                     <rect 
-                        x={ndviDateRange.startX - 10} 
+                        x={ndviDateRange.startX - 15} 
                         y="0" 
-                        width={ndviDateRange.endX - ndviDateRange.startX + 20} 
+                        width={ndviDateRange.endX - ndviDateRange.startX + 30} 
                         height={height} 
                         fill="url(#ndvi-fade)"
                     />
@@ -658,15 +649,17 @@
                 {/each}
             </g>
 
-            <!-- Baseline at y=0 -->
-            <line
-                x1="0"
-                x2={width}
-                y1={yScale(0)}
-                y2={yScale(0)}
-                stroke="rgba(255,255,255,0.3)"
-                stroke-width="1"
-            />
+            <!-- Baseline at y=0 (only in single species mode) -->
+            {#if selectedSpecies}
+                <line
+                    x1="0"
+                    x2={width}
+                    y1={yScale(0)}
+                    y2={yScale(0)}
+                    stroke="rgba(255,255,255,0.3)"
+                    stroke-width="1"
+                />
+            {/if}
             
             <!-- Month labels at top -->
             <g class="month-labels">
@@ -690,10 +683,12 @@
                             d={stream.path}
                             fill={stream.color}
                             stroke={stream.color}
-                            stroke-width="0.5"
-                            filter="url(#stream-glow)"
+                            stroke-width={hoveredStreamName && hoveredStreamName === stream.name ? 1.2 : 0.5}
+                            filter={hoveredStreamName && hoveredStreamName === stream.name ? "url(#stream-glow)" : undefined}
                             class="stream-path animated-path"
-                            opacity="0.85"
+                            class:dimmed={hoveredStreamName && hoveredStreamName !== stream.name}
+                            class:hovered={hoveredStreamName && hoveredStreamName === stream.name}
+                            style="opacity: {hoveredStreamName ? (hoveredStreamName === stream.name ? 1 : 0.12) : 0.85}"
                             role="img"
                             aria-label={stream.name}
                         />
@@ -755,7 +750,7 @@
                                         <path
                                             d={pathD}
                                             fill="none"
-                                            stroke="rgba(34, 197, 94, 0.7)"
+                                            stroke="rgba(85, 107, 47, 0.7)"
                                             stroke-width="1.2"
                                             opacity="0.25"
                                             class="ndvi-logger-line animated-line"
@@ -881,17 +876,32 @@
                 {/if}
             </g>
 
-            <!-- Vertical line indicator for tooltip -->
+            <!-- Vertical line indicator for tooltip (full height dashed) -->
             {#if tooltip.show}
                 <line
                     x1={tooltip.chartX}
                     x2={tooltip.chartX}
                     y1="0"
                     y2={height}
-                    stroke="rgba(255, 255, 255, 0.5)"
+                    stroke="rgba(255, 255, 255, {tooltip.segmentTop != null ? 0.35 : 0.5})"
                     stroke-width="1.5"
                     stroke-dasharray="4 4"
                     class="tooltip-line"
+                    transition:fade={{ duration: 100 }}
+                />
+            {/if}
+
+            <!-- Solid, thicker cursor segment over the hovered stream only -->
+            {#if tooltip.show && tooltip.segmentTop != null && tooltip.segmentBottom != null}
+                <line
+                    x1={tooltip.chartX}
+                    x2={tooltip.chartX}
+                    y1={tooltip.segmentTop}
+                    y2={tooltip.segmentBottom}
+                    stroke="white"
+                    stroke-width="2.6"
+                    stroke-linecap="round"
+                    class="tooltip-segment-line"
                     transition:fade={{ duration: 100 }}
                 />
             {/if}
@@ -962,6 +972,7 @@
             {/if}
         </div>
     {/if}
+    {/if}
 </div>
 
 <style>
@@ -1018,6 +1029,24 @@
 
     .stream-path {
         transition: d 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease-out;
+    }
+
+    .stream-path.dimmed {
+        opacity: 0.3 !important;
+        filter: none !important;
+        transition: opacity 0.18s ease-out;
+    }
+
+    .stream-path.hovered {
+        opacity: 1 !important;
+        /* slightly thicker outline for emphasis */
+        stroke-width: 1.2 !important;
+        filter: url(#stream-glow);
+        transition: opacity 0.12s ease-out, stroke-width 0.12s ease-out;
+    }
+
+    .tooltip-segment-line {
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45));
     }
 
     .mean-line {
