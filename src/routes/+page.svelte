@@ -4,11 +4,14 @@
 	import ActivityChart from '$lib/ActivityChart.svelte';
 	import SpeciesSelector from '$lib/SpeciesSelector.svelte';
 	import ViewControls from '$lib/ViewControls.svelte';
+	import KDEMap from '$lib/KDEMap.svelte';
 	import type { SpeciesData } from '$lib/types';
 	import { getCommonName, getBaseName, getSpeciesData } from '$lib/types';
+	import { loadAllData, subscribeToLoading, type LoadingProgress } from '$lib/dataStore';
 
 	let data = $state<SpeciesData | null>(null);
 	let loading = $state(true);
+	let loadingProgress = $state<LoadingProgress>({ stage: 'idle', message: 'Initializing...', progress: 0 });
 	let error = $state<string | null>(null);
 
 	// UI state
@@ -17,6 +20,7 @@
 	let showTemperature = $state(false);
 	let showPrecipitation = $state(false);
 	let showNdvi = $state(false);
+	let viewMode = $state<'chart' | 'map'>('chart');
 	
 	// Mobile UI state
 	let mobileSheetOpen = $state(false);
@@ -43,25 +47,31 @@
 		return d3.scaleOrdinal<string>().range(colors);
 	});
 
-	onMount(async () => {
-		try {
-			const response = await fetch('/detections/species_data.json');
-			if (!response.ok) throw new Error('Failed to load data');
-			data = await response.json();
-			
-			// Set domain for color scale
-			if (data?.species) {
-				colorScale.domain(data.species.map(s => s.name));
-			}
+	onMount(() => {
+		// Subscribe to loading progress updates
+		const unsubscribe = subscribeToLoading((progress) => {
+			loadingProgress = progress;
+		});
 
-			const birdResponse = await fetch('/bird_data.json');
-			if (!birdResponse.ok) throw new Error('Failed to load bird data');
-			birdData = await birdResponse.json();
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Unknown error';
-		} finally {
-			loading = false;
-		}
+		// Load all data upfront
+		loadAllData(imageMap)
+			.then((appData) => {
+				data = appData.speciesData;
+				birdData = appData.birdData;
+				
+				// Set domain for color scale
+				if (data?.species) {
+					colorScale.domain(data.species.map(s => s.name));
+				}
+				
+				loading = false;
+			})
+			.catch((e) => {
+				error = e instanceof Error ? e.message : 'Unknown error';
+				loading = false;
+			});
+
+		return unsubscribe;
 	});
 
 	function handleSpeciesSelect(name: string | null) {
@@ -97,12 +107,20 @@
 		mobileSheetOpen = false;
 	}
 
+	function setViewMode(mode: 'chart' | 'map') {
+		viewMode = mode;
+	}
+
 	// Derived values
 	const displayScientificName = $derived(selectedSpecies ? getBaseName(selectedSpecies) : null);
 	const chartTitle = $derived(
-		selectedSpecies 
-			? getCommonName(displayScientificName ?? selectedSpecies, birdData ?? undefined)
-			: 'Activity Streams'
+		viewMode === 'map' 
+			? (selectedSpecies 
+				? getCommonName(displayScientificName ?? selectedSpecies, birdData ?? undefined)
+				: 'Detection Density')
+			: (selectedSpecies 
+				? getCommonName(displayScientificName ?? selectedSpecies, birdData ?? undefined)
+				: 'Activity Streams')
 	);
 
 	const subtitle = $derived(
@@ -123,9 +141,70 @@
 
 <main>
 	{#if loading}
-		<div class="loading">
-			<div class="spinner"></div>
-			<p>Loading acoustic data...</p>
+		<div class="loading-screen">
+			<div class="loading-content">
+				<div class="loading-header">
+					<span class="loading-pre-title">the</span>
+					<h1 class="loading-title">WYTHAM WOODS</h1>
+					<span class="loading-sub-title">Acoustic Monitor</span>
+				</div>
+				
+				<div class="loading-progress-container">
+					<div class="loading-progress-bar">
+						<div 
+							class="loading-progress-fill" 
+							style="width: {loadingProgress.progress}%"
+						></div>
+					</div>
+					<div class="loading-status">
+						<span class="loading-message">{loadingProgress.message}</span>
+						<span class="loading-percent">{loadingProgress.progress}%</span>
+					</div>
+				</div>
+				
+				<div class="loading-stages">
+					<div class="loading-stage" class:active={loadingProgress.stage === 'species'} class:done={loadingProgress.progress > 25}>
+						<div class="stage-icon">
+							{#if loadingProgress.progress > 25}
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+							{:else}
+								<div class="stage-dot"></div>
+							{/if}
+						</div>
+						<span>Detection data</span>
+					</div>
+					<div class="loading-stage" class:active={loadingProgress.stage === 'loggers'} class:done={loadingProgress.progress > 40}>
+						<div class="stage-icon">
+							{#if loadingProgress.progress > 40}
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+							{:else}
+								<div class="stage-dot"></div>
+							{/if}
+						</div>
+						<span>Sensor network</span>
+					</div>
+					<div class="loading-stage" class:active={loadingProgress.stage === 'birds' || loadingProgress.stage === 'ndvi' || loadingProgress.stage === 'processing'} class:done={loadingProgress.progress > 70}>
+						<div class="stage-icon">
+							{#if loadingProgress.progress > 70}
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+							{:else}
+								<div class="stage-dot"></div>
+							{/if}
+						</div>
+						<span>Processing data</span>
+					</div>
+					<div class="loading-stage" class:active={loadingProgress.stage === 'weather' || loadingProgress.stage === 'images'} class:done={loadingProgress.progress >= 100}>
+						<div class="stage-icon">
+							{#if loadingProgress.progress >= 100}
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+							{:else}
+								<div class="stage-dot"></div>
+							{/if}
+						</div>
+						<span>Weather & images</span>
+					</div>
+				</div>
+			</div>
 		</div>
 	{:else if error}
 		<div class="error">
@@ -166,42 +245,88 @@
 						<h2>{chartTitle}</h2>
 						{#if selectedSpecies}
 							<span class="scientific-name">{displayScientificName}</span>
-						{:else}
+						{:else if viewMode === 'chart'}
 							<span class="chart-description">Daily detections for top 10 species</span>
+						{:else}
+							<span class="chart-description">Spatial density by week</span>
 						{/if}
 					</div>
-					<ViewControls 
-						{showSiteLines}
-						onToggleSiteLines={toggleSiteLines}
-						siteCount={data.metadata.nSites}
-						{selectedSpecies}
-						{showTemperature}
-						onToggleTemperature={toggleTemperature}
-						{showPrecipitation}
-						onTogglePrecipitation={togglePrecipitation}
-						{showNdvi}
-						onToggleNdvi={toggleNdvi}
-					/>
+					<div class="chart-controls">
+						<!-- View mode toggle -->
+						{#if viewMode === 'chart'}
+							<ViewControls 
+								{showSiteLines}
+								onToggleSiteLines={toggleSiteLines}
+								siteCount={data.metadata.nSites}
+								{selectedSpecies}
+								{showTemperature}
+								onToggleTemperature={toggleTemperature}
+								{showPrecipitation}
+								onTogglePrecipitation={togglePrecipitation}
+								{showNdvi}
+								onToggleNdvi={toggleNdvi}
+							/>
+						{/if}
+						
+						<div class="view-mode-toggle">
+							<button 
+								class="mode-btn" 
+								class:active={viewMode === 'chart'}
+								onclick={() => setViewMode('chart')}
+								aria-label="Chart view"
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<rect x="3" y="10" width="4" height="11" rx="1"/>
+									<rect x="10" y="6" width="4" height="15" rx="1"/>
+									<rect x="17" y="3" width="4" height="18" rx="1"/>
+								</svg>
+								<span>Timeline</span>
+							</button>
+							<button 
+								class="mode-btn" 
+								class:active={viewMode === 'map'}
+								onclick={() => setViewMode('map')}
+								aria-label="Map view"
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.3"/>
+									<circle cx="12" cy="12" r="6" opacity="0.5"/>
+									<circle cx="12" cy="12" r="9"/>
+								</svg>
+								<span>Density</span>
+							</button>
+						</div>
+					</div>
 				</div>
 				
 				<div class="chart-wrapper">
-					{#if selectedSpecies && selectedSpeciesImage()}
-						<div class="species-image-overlay">
-							<img src={selectedSpeciesImage()} alt={chartTitle} />
-						</div>
+					{#if viewMode === 'chart'}
+						{#if selectedSpecies && selectedSpeciesImage()}
+							<div class="species-image-overlay">
+								<img src={selectedSpeciesImage()} alt={chartTitle} />
+							</div>
+						{/if}
+						<ActivityChart 
+							species={data.species}
+							{selectedSpecies}
+							{showSiteLines}
+							{colorScale}
+							{birdData}
+							{imageMap}
+							{showTemperature}
+							{showPrecipitation}
+							{showNdvi}
+							dateRange={data.metadata.dateRange}
+						/>
+					{:else}
+						<KDEMap
+							species={data.species}
+							{selectedSpecies}
+							{colorScale}
+							{birdData}
+							{imageMap}
+						/>
 					{/if}
-					<ActivityChart 
-						species={data.species}
-						{selectedSpecies}
-						{showSiteLines}
-						{colorScale}
-						{birdData}
-						{imageMap}
-						{showTemperature}
-						{showPrecipitation}
-						{showNdvi}
-						dateRange={data.metadata.dateRange}
-					/>
 				</div>
 			</section>
 
@@ -246,9 +371,37 @@
 			</header>
 
 			<!-- Mobile Chart Area -->
-			<section class="mobile-chart-section" class:stream-view={!selectedSpecies}>
-				<!-- Species Info Bar (when species selected) -->
-				{#if selectedSpecies}
+			<section class="mobile-chart-section" class:stream-view={!selectedSpecies && viewMode === 'chart'}>
+				<!-- View mode toggle (mobile) -->
+				<div class="mobile-view-toggle">
+					<button 
+						class="mobile-mode-btn" 
+						class:active={viewMode === 'chart'}
+						onclick={() => setViewMode('chart')}
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<rect x="3" y="10" width="4" height="11" rx="1"/>
+							<rect x="10" y="6" width="4" height="15" rx="1"/>
+							<rect x="17" y="3" width="4" height="18" rx="1"/>
+						</svg>
+						<span>Timeline</span>
+					</button>
+					<button 
+						class="mobile-mode-btn" 
+						class:active={viewMode === 'map'}
+						onclick={() => setViewMode('map')}
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.3"/>
+							<circle cx="12" cy="12" r="6" opacity="0.5"/>
+							<circle cx="12" cy="12" r="9"/>
+						</svg>
+						<span>Density</span>
+					</button>
+				</div>
+
+				<!-- Species Info Bar (when species selected and chart view) -->
+				{#if selectedSpecies && viewMode === 'chart'}
 					<div class="mobile-species-bar">
 						<div class="mobile-species-info">
 							<div class="mobile-chart-title">
@@ -262,8 +415,11 @@
 									onclick={toggleSiteLines}
 								>
 									<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<path d="M3 3v18h18"/>
-										<path d="M7 16l4-8 4 5 6-9"/>
+										<circle cx="12" cy="12" r="2"/>
+										<circle cx="6" cy="6" r="1.5"/>
+										<circle cx="18" cy="6" r="1.5"/>
+										<circle cx="6" cy="18" r="1.5"/>
+										<circle cx="18" cy="18" r="1.5"/>
 									</svg>
 									<span>Sites</span>
 								</button>
@@ -293,9 +449,10 @@
 									onclick={toggleNdvi}
 								>
 									<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<path d="M12 2a10 10 0 1 0 10 10"/>
-										<path d="M12 12 4.93 19.07"/>
-										<path d="M12 2v10"/>
+										<path d="M12 22c-4.97 0-9-2.69-9-6v-.5C3 11.57 7.03 9 12 9s9 2.57 9 6.5v.5c0 3.31-4.03 6-9 6z"/>
+										<path d="M12 9V2"/>
+										<path d="M12 9c-2 0-4-2-4-4"/>
+										<path d="M12 9c2 0 4-2 4-4"/>
 									</svg>
 									<span>NDVI</span>
 								</button>
@@ -307,30 +464,57 @@
 							</div>
 						{/if}
 					</div>
-				{:else}
+				{:else if viewMode === 'chart'}
 					<!-- Stream view header -->
 					<div class="mobile-chart-header">
 						<div class="mobile-chart-title">
 							<h2>{chartTitle}</h2>
 						</div>
 					</div>
+				{:else if selectedSpecies}
+					<!-- Map view with species selected header -->
+					<div class="mobile-chart-header">
+						<div class="mobile-chart-title">
+							<h2>{chartTitle}</h2>
+							<span class="mobile-scientific">{displayScientificName}</span>
+						</div>
+					</div>
+				{:else}
+					<!-- Map view header -->
+					<div class="mobile-chart-header">
+						<div class="mobile-chart-title">
+							<h2>{chartTitle}</h2>
+							<span class="mobile-scientific">Spatial density by week</span>
+						</div>
+					</div>
 				{/if}
 
-				<!-- Chart -->
-				<div class="mobile-chart-wrapper" class:stream-view={!selectedSpecies}>
-					<ActivityChart 
-						species={data.species}
-						{selectedSpecies}
-						{showSiteLines}
-						{colorScale}
-						{birdData}
-						{imageMap}
-						{showTemperature}
-						{showPrecipitation}
-						{showNdvi}
-						dateRange={data.metadata.dateRange}
-						isMobile={true}
-					/>
+				<!-- Chart or Map -->
+				<div class="mobile-chart-wrapper" class:stream-view={!selectedSpecies && viewMode === 'chart'}>
+					{#if viewMode === 'chart'}
+						<ActivityChart 
+							species={data.species}
+							{selectedSpecies}
+							{showSiteLines}
+							{colorScale}
+							{birdData}
+							{imageMap}
+							{showTemperature}
+							{showPrecipitation}
+							{showNdvi}
+							dateRange={data.metadata.dateRange}
+							isMobile={true}
+						/>
+					{:else}
+						<KDEMap
+							species={data.species}
+							{selectedSpecies}
+							{colorScale}
+							{birdData}
+							{imageMap}
+							isMobile={true}
+						/>
+					{/if}
 				</div>
 			</section>
 
@@ -418,6 +602,147 @@
 		to { opacity: 1; transform: translateY(0); }
 	}
 
+	/* Loading Screen */
+	.loading-screen {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 100vh;
+		background: var(--color-bg);
+	}
+
+	.loading-content {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 40px;
+		max-width: 320px;
+		width: 100%;
+		padding: 24px;
+	}
+
+	.loading-header {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0px;
+	}
+
+	.loading-pre-title {
+		font-family: var(--font-serif);
+		font-size: 14px;
+		color: var(--color-text-dim);
+		font-style: italic;
+		margin-bottom: -2px;
+	}
+
+	.loading-title {
+		font-size: 28px;
+		font-weight: 700;
+		letter-spacing: 0.15em;
+		color: var(--color-text);
+		margin: -4px 0;
+	}
+
+	.loading-sub-title {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--color-text-muted);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		margin-top: -2px;
+	}
+
+	.loading-progress-container {
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.loading-progress-bar {
+		width: 100%;
+		height: 4px;
+		background: rgba(255, 255, 255, 0.1);
+		border-radius: 2px;
+		overflow: hidden;
+	}
+
+	.loading-progress-fill {
+		height: 100%;
+		background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+		border-radius: 2px;
+		transition: width 0.3s ease-out;
+	}
+
+	.loading-status {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.loading-message {
+		font-size: 13px;
+		color: var(--color-text-muted);
+	}
+
+	.loading-percent {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--color-text-dim);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.loading-stages {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		width: 100%;
+	}
+
+	.loading-stage {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--color-text-dim);
+		transition: color 0.2s ease;
+	}
+
+	.loading-stage.active {
+		color: var(--color-text);
+	}
+
+	.loading-stage.done {
+		color: var(--color-primary);
+	}
+
+	.stage-icon {
+		width: 20px;
+		height: 20px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.stage-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: currentColor;
+		opacity: 0.5;
+	}
+
+	.loading-stage.active .stage-dot {
+		opacity: 1;
+		animation: pulse 1s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { transform: scale(1); opacity: 1; }
+		50% { transform: scale(1.3); opacity: 0.7; }
+	}
+
 	.loading, .error {
 		display: flex;
 		flex-direction: column;
@@ -495,7 +820,7 @@
 		color: var(--color-text-muted);
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		margin-top: 6px;
+		margin-top: 2px;
 	}
 
 	.stats {
@@ -529,7 +854,7 @@
 	.chart-section {
 		background: var(--color-bg-elevated);
 		border-radius: 12px;
-		padding: 20px 24px 0px 24px;
+		padding: 20px 24px 24px 24px;
 		border: 1px solid var(--color-border-subtle);
 		flex: 1;
 		min-height: 0;
@@ -543,6 +868,56 @@
 		align-items: flex-start;
 		margin-bottom: 12px;
 		flex-shrink: 0;
+	}
+
+	.chart-controls {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	/* View mode toggle (segmented control) */
+	.view-mode-toggle {
+		display: flex;
+		background: rgba(255, 255, 255, 0.04);
+		border-radius: 20px;
+		padding: 3px;
+		gap: 2px;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+	}
+
+	.mode-btn {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 14px;
+		border: none;
+		border-radius: 16px;
+		background: transparent;
+		color: rgba(255, 255, 255, 0.45);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.mode-btn:hover {
+		color: rgba(255, 255, 255, 0.7);
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.mode-btn.active {
+		background: rgba(255, 255, 255, 0.1);
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.mode-btn svg {
+		flex-shrink: 0;
+		opacity: 0.7;
+	}
+
+	.mode-btn.active svg {
+		opacity: 1;
 	}
 
 	.chart-title-group {
@@ -584,7 +959,7 @@
 
 	.species-image-overlay {
 		position: absolute;
-		bottom: 28px;
+		bottom: 5px;
 		right: 16px;
 		z-index: 5;
 		pointer-events: none;
@@ -818,13 +1193,13 @@
 		min-height: 0;
 		display: flex;
 		flex-direction: column;
-		padding: 12px 12px 8px;
+		padding: 12px 12px 12px;
 		max-height: calc(100vh - 220px);
 		gap: 8px;
 	}
 
 	.mobile-chart-section.stream-view {
-		padding: 12px 4px 8px;
+		padding: 12px 4px 12px;
 	}
 
 	/* Species Info Bar (when species selected) */
@@ -880,11 +1255,53 @@
 		margin-bottom: 5px;
 	}
 
+	/* Mobile View Mode Toggle */
+	.mobile-view-toggle {
+		display: flex;
+		justify-content: center;
+		gap: 4px;
+		padding: 0 12px 10px;
+		flex-shrink: 0;
+	}
+
+	.mobile-mode-btn {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 18px;
+		border-radius: 20px;
+		border: none;
+		background: rgba(255, 255, 255, 0.06);
+		color: rgba(255, 255, 255, 0.45);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.mobile-mode-btn:active {
+		transform: scale(0.97);
+	}
+
+	.mobile-mode-btn.active {
+		background: rgba(255, 255, 255, 0.12);
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.mobile-mode-btn svg {
+		flex-shrink: 0;
+		opacity: 0.7;
+	}
+
+	.mobile-mode-btn.active svg {
+		opacity: 1;
+	}
+
 	/* Mobile Toggle Pills */
 	.mobile-toggles-row {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 6px;
+		gap: 5px;
 		flex-shrink: 0;
 	}
 
@@ -894,9 +1311,9 @@
 		gap: 4px;
 		padding: 5px 10px;
 		border-radius: 14px;
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		background: rgba(255, 255, 255, 0.04);
-		color: rgba(255, 255, 255, 0.55);
+		border: none;
+		background: rgba(255, 255, 255, 0.06);
+		color: rgba(255, 255, 255, 0.45);
 		font-size: 11px;
 		font-weight: 500;
 		cursor: pointer;
@@ -909,26 +1326,22 @@
 
 	.mobile-pill.active {
 		background: rgba(255, 255, 255, 0.12);
-		border-color: rgba(255, 255, 255, 0.2);
-		color: rgba(255, 255, 255, 0.85);
+		color: rgba(255, 255, 255, 0.95);
 	}
 
 	.mobile-pill.temp.active {
-		background: rgba(255, 107, 53, 0.2);
-		border-color: rgba(255, 107, 53, 0.35);
-		color: rgba(255, 180, 140, 1);
+		background: rgba(239, 68, 68, 0.15);
+		color: #fca5a5;
 	}
 
 	.mobile-pill.precip.active {
-		background: rgba(96, 165, 250, 0.2);
-		border-color: rgba(96, 165, 250, 0.35);
-		color: rgba(160, 200, 255, 1);
+		background: rgba(59, 130, 246, 0.15);
+		color: #93c5fd;
 	}
 
 	.mobile-pill.ndvi.active {
-		background: rgba(34, 197, 94, 0.2);
-		border-color: rgba(34, 197, 94, 0.35);
-		color: rgba(130, 220, 160, 1);
+		background: rgba(34, 197, 94, 0.15);
+		color: #86efac;
 	}
 
 	.mobile-pill svg {
