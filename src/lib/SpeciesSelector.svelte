@@ -34,7 +34,8 @@
 		{@const isDimmed = selectedSpecies !== null && !isActive}
 		{@const speciesData = getSpeciesData(sp.name, birdData)}
 		{@const speciesCode = speciesData?.species_code}
-		{@const imageSrc = speciesCode ? imageMap[speciesCode] : null}
+		{@const adjustedCode = sp.name === 'Turdus merula' ? 'eurbla_blackbird' : speciesCode}
+		{@const imageSrc = adjustedCode ? imageMap[adjustedCode] : null}
 		{@const commonName = getCommonName(sp.name, birdData)}
 		{@const nameParts = commonName.split(' ')}
 		{@const firstLine = nameParts.slice(0, 1).join(' ')}

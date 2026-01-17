@@ -33,6 +33,7 @@
 		'comchi': '/bird-illustrations/comchi5_153500441.png',
 		'eubtit': '/bird-illustrations/eubtit2_153092381.png',
 		'eurbla': '/bird-illustrations/eurbla5_153116731.png',
+		'eurbla_blackbird': '/bird-illustrations/eurbla8_153524171.png',
 		'eurnut': '/bird-illustrations/eurnut23_153513341.png',
 		'eurrob': '/bird-illustrations/eurrob1_153149541.png',
 		'eurwre': '/bird-illustrations/eurwre9_153132761.png',
@@ -130,7 +131,13 @@
 	const selectedSpeciesImage = $derived(() => {
 		if (!selectedSpecies || !birdData) return null;
 		const speciesData = getSpeciesData(selectedSpecies, birdData);
-		const code = speciesData?.species_code;
+		let code = speciesData?.species_code;
+		
+		// Special case: Blackbird (Turdus merula) should use different image than Blackcap
+		if (selectedSpecies === 'Turdus merula') {
+			code = 'eurbla_blackbird';
+		}
+		
 		return code ? imageMap[code] : null;
 	});
 </script>
@@ -526,7 +533,8 @@
 						{#if selectedSpecies}
 							{@const speciesData = getSpeciesData(selectedSpecies, birdData ?? undefined)}
 							{@const code = speciesData?.species_code}
-							{@const imgSrc = code ? imageMap[code] : null}
+							{@const adjustedCode = selectedSpecies === 'Turdus merula' ? 'eurbla_blackbird' : code}
+							{@const imgSrc = adjustedCode ? imageMap[adjustedCode] : null}
 							{#if imgSrc}
 								<img src={imgSrc} alt="" class="peek-image" />
 							{:else}
@@ -549,7 +557,8 @@
 							{@const isActive = selectedSpecies === sp.name}
 							{@const speciesData = getSpeciesData(sp.name, birdData ?? undefined)}
 							{@const speciesCode = speciesData?.species_code}
-							{@const imageSrc = speciesCode ? imageMap[speciesCode] : null}
+							{@const adjustedCode = sp.name === 'Turdus merula' ? 'eurbla_blackbird' : speciesCode}
+							{@const imageSrc = adjustedCode ? imageMap[adjustedCode] : null}
 							{@const commonName = getCommonName(sp.name, birdData ?? undefined)}
 							<button
 								class="species-card"
@@ -621,11 +630,18 @@
 		padding: 24px;
 	}
 
+	@media (min-width: 769px) {
+		.loading-content {
+			max-width: 400px;
+		}
+	}
+
 	.loading-header {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 0px;
+		text-align: center;
 	}
 
 	.loading-pre-title {
@@ -698,15 +714,18 @@
 		flex-direction: column;
 		gap: 12px;
 		width: 100%;
+		align-items: center;
 	}
 
 	.loading-stage {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 12px;
 		font-size: 13px;
 		color: var(--color-text-dim);
 		transition: color 0.2s ease;
+		text-align: center;
 	}
 
 	.loading-stage.active {

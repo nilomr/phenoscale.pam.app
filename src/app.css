@@ -1,5 +1,29 @@
 @import 'tailwindcss';
 
+@font-face {
+	font-family: 'Inter';
+	font-style: normal;
+	font-weight: 300 700;
+	font-display: swap;
+	src: url('https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'DM Serif Text';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('https://fonts.gstatic.com/s/dmseriftext/v13/rnCu-xZa_krGokauCeNq1wWyWfSFXQ.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'DM Serif Text';
+	font-style: italic;
+	font-weight: 400;
+	font-display: swap;
+	src: url('https://fonts.gstatic.com/s/dmseriftext/v13/rnCw-xZa_krGokauCeNq1wWyWfG1X1oN.woff2') format('woff2');
+}
+
 :root {
 	/* Colors */
 	--color-bg: #1a1b1e;

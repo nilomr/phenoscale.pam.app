@@ -469,7 +469,8 @@
                 const value = sp.timeSeries.mean[i] ?? 0;
                 const speciesInfo = getSpeciesData(sp.name, birdData ?? undefined);
                 const speciesCode = speciesInfo?.species_code;
-                const imageSrc = speciesCode ? imageMap[speciesCode] : null;
+                const adjustedCode = sp.name === 'Turdus merula' ? 'eurbla_blackbird' : speciesCode;
+                const imageSrc = adjustedCode ? imageMap[adjustedCode] : null;
                 speciesData = {
                     name: sp.name,
                     value: Math.round(value * 10) / 10,
@@ -490,7 +491,8 @@
                     const value = point[1] - point[0];
                     const speciesInfo = getSpeciesData(series.key, birdData ?? undefined);
                     const speciesCode = speciesInfo?.species_code;
-                    const imageSrc = speciesCode ? imageMap[speciesCode] : null;
+                    const adjustedCode = series.key === 'Turdus merula' ? 'eurbla_blackbird' : speciesCode;
+                    const imageSrc = adjustedCode ? imageMap[adjustedCode] : null;
                     speciesData = {
                         name: series.key,
                         value: Math.round(value * 10) / 10,
